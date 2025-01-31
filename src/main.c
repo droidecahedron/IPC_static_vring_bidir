@@ -15,18 +15,22 @@
 K_THREAD_STACK_DEFINE(ipc0A_stack, STACKSIZE);
 K_THREAD_STACK_DEFINE(ipc0B_stack, STACKSIZE);
 K_THREAD_STACK_DEFINE(ipc1_stack, STACKSIZE);
+K_THREAD_STACK_DEFINE(ipc2_stack, STACKSIZE);
 
 static volatile uint8_t ipc0A_received_data;
 static volatile uint8_t ipc0B_received_data;
 static volatile uint8_t ipc1_received_data;
+static volatile uint8_t ipc2_received_data;
 
 static K_SEM_DEFINE(ipc0A_bound_sem, 0, 1);
 static K_SEM_DEFINE(ipc0B_bound_sem, 0, 1);
 static K_SEM_DEFINE(ipc1_bound_sem, 0, 1);
+static K_SEM_DEFINE(ipc2_bound_sem, 0, 1);
 
 static K_SEM_DEFINE(ipc0A_data_sem, 0, 1);
 static K_SEM_DEFINE(ipc0B_data_sem, 0, 1);
 static K_SEM_DEFINE(ipc1_data_sem, 0, 1);
+static K_SEM_DEFINE(ipc2_data_sem, 0, 1);
 
 /*
  * ==> THREAD 0A (IPC instance 0 - endpoint A) <==
@@ -283,3 +287,107 @@ static void ipc1_entry(void *dummy0, void *dummy1, void *dummy2)
 	printk("IPC-service HOST [INST 1] demo ended.\n");
 }
 K_THREAD_DEFINE(ipc1_thread_id, STACKSIZE, ipc1_entry, NULL, NULL, NULL, PRIORITY, 0, 0);
+
+/*
+ * ==> THREAD 2 (IPC instance 2) <==
+ *
+ * NOTE: This instance is using the NOCOPY copability of the backend.
+ */
+
+
+static struct ipc_ept ipc2_ept;
+static void *recv_data_extra;
+
+static void ipc2_ept_bound(void *priv)
+{
+	k_sem_give(&ipc2_bound_sem);
+}
+
+static void ipc2_ept_recv(const void *data, size_t len, void *priv)
+{
+	int ret;
+
+	ret = ipc_service_hold_rx_buffer(&ipc2_ept, (void *) data);
+	if (ret < 0) {
+		printk("ipc_service_hold_rx_buffer failed with ret %d\n", ret);
+	}
+
+	/*
+	 * This will only support a synchronous request-answer mechanism. For
+	 * asynchronous cases a chain list should be implemented.
+	 */
+	recv_data_extra = (void *) data;
+
+	k_sem_give(&ipc2_data_sem);
+}
+
+static struct ipc_ept_cfg ipc2_ept_cfg = {
+	.name = "ipc2",
+	.cb = {
+		.bound    = ipc2_ept_bound,
+		.received = ipc2_ept_recv,
+	},
+};
+
+static void ipc2_entry(void *dummy0, void *dummy1, void *dummy2)
+{
+	ARG_UNUSED(dummy0);
+	ARG_UNUSED(dummy1);
+	ARG_UNUSED(dummy2);
+
+	const struct device *ipc2_instance;
+	unsigned char message = 0;
+	int ret;
+
+	printk("IPC-service HOST [INST 2] demo started\n");
+
+	ipc2_instance = DEVICE_DT_GET(DT_NODELABEL(ipc2));
+
+	ret = ipc_service_open_instance(ipc2_instance);
+	if (ret < 0 && ret != -EALREADY) {
+		printk("ipc_service_open_instance() failure\n");
+		return;
+	}
+
+	ret = ipc_service_register_endpoint(ipc2_instance, &ipc2_ept, &ipc2_ept_cfg);
+	if (ret < 0) {
+		printf("ipc_service_register_endpoint() failure\n");
+		return;
+	}
+
+	k_sem_take(&ipc2_bound_sem, K_FOREVER);
+
+	while (message < 50) {
+		uint32_t len = sizeof(message);
+		void *data;
+
+		k_sem_take(&ipc2_data_sem, K_FOREVER);
+
+		printk("HOST [2]: %d\n", *((unsigned char *) recv_data_extra));
+
+		ret = ipc_service_get_tx_buffer(&ipc2_ept, &data, &len, K_FOREVER);
+		if (ret < 0) {
+			printk("ipc_service_get_tx_buffer failed with ret %d\n", ret);
+			break;
+		}
+
+		*((unsigned char *) data) = *((unsigned char *) recv_data_extra) + 1;
+
+		ret = ipc_service_release_rx_buffer(&ipc2_ept, recv_data_extra);
+		if (ret < 0) {
+			printk("ipc_service_release_rx_buffer failed with ret %d\n", ret);
+			break;
+		}
+
+		ret = ipc_service_send_nocopy(&ipc2_ept, data, sizeof(unsigned char));
+		if (ret < 0) {
+			printk("send_message(%d) failed with ret %d\n", message, ret);
+			break;
+		}
+
+		message++;
+	}
+
+	printk("IPC-service HOST [INST 2] demo ended.\n");
+}
+K_THREAD_DEFINE(ipc2_thread_id, STACKSIZE, ipc2_entry, NULL, NULL, NULL, PRIORITY, 0, 2000);

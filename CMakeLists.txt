@@ -21,7 +21,7 @@ if(NOT (CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPP OR
   message(FATAL_ERROR "${BOARD} is not supported for this sample")
 endif()
 
-project(ipc_service)
+project(IPC_static_vring_bidir)
 
 if(CONFIG_INCLUDE_REMOTE_DIR)
   target_include_directories(zephyr_interface
