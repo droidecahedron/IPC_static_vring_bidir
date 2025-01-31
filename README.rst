@@ -9,7 +9,10 @@ Overview
 
 This application demonstrates how to use IPC Service and the static vrings
 backend with Zephyr. It is designed to demonstrate how to integrate it with
-Zephyr both from a build perspective and code.
+Zephyr both from a build perspective and code. There is an extra ipc instance that 
+sends data back from one core to the other, highlighting that you swap the return 
+path. The second transceive ipc task runs at a delay that can be seen in the thread
+define for ipc2's task entry.
 
 Building the application for nrf5340dk/nrf5340/cpuapp
 *****************************************************
@@ -20,41 +23,7 @@ Building the application for nrf5340dk/nrf5340/cpuapp
    :goals: debug
    :west-args: --sysbuild
 
-Building the application for lpcxpresso55s69/lpc55s69/cpu0
-**********************************************************
 
-.. zephyr-app-commands::
-   :zephyr-app: samples/subsys/ipc/ipc_service/static_vrings
-   :board: lpcxpresso55s69/lpc55s69/cpu0
-   :goals: debug
-   :west-args: --sysbuild
-
-Building the application for mimxrt1160_evk/mimxrt1166/cm7
-**********************************************************
-
-.. zephyr-app-commands::
-   :zephyr-app: samples/subsys/ipc/ipc_service/static_vrings
-   :board: mimxrt1160_evk/mimxrt1166/cm7
-   :goals: debug
-   :west-args: --sysbuild
-
-Building the application for mimxrt1170_evk/mimxrt1176/cm7
-**********************************************************
-
-.. zephyr-app-commands::
-   :zephyr-app: samples/subsys/ipc/ipc_service/static_vrings
-   :board: mimxrt1170_evk/mimxrt1176/cm7
-   :goals: debug
-   :west-args: --sysbuild
-
-Building the application for mimxrt1170_evk@B/mimxrt1176/cm7
-************************************************************
-
-.. zephyr-app-commands::
-   :zephyr-app: samples/subsys/ipc/ipc_service/static_vrings
-   :board: mimxrt1170_evk@B/mimxrt1176/cm7
-   :goals: debug
-   :west-args: --sysbuild
 
 Open a serial terminal (minicom, putty, etc.) and connect the board with the
 following settings:
@@ -79,6 +48,14 @@ serial port, one is host another is remote:
    HOST [1]: 7
    HOST [1]: 9
    ...
+   <a few seconds pass>
+   IPC-service HOST [INST 2] demo started
+   ...
+   HOST [2]: 92
+   HOST [2]: 94
+   HOST [2]: 96
+   HOST [2]: 98
+   IPC-service HOST [INST 2] demo ended.
 
 
 .. code-block:: console
@@ -93,3 +70,11 @@ serial port, one is host another is remote:
    REMOTE [1]: 6
    REMOTE [1]: 8
    ...
+   <a few seconds pass>
+   IPC-service REMOTE [INST 2] demo started
+   ...
+   REMOTE [2]: 95
+   REMOTE [2]: 97
+   REMOTE [2]: 99
+   IPC-service REMOTE [INST 2] demo ended.
+
