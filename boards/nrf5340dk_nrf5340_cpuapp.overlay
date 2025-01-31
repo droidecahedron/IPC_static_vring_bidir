@@ -19,7 +19,11 @@
 		};
 
 		sram_ipc1: memory@20078000 {
-			reg = <0x20078000 0x8000>;
+			reg = <0x20078000 0x4000>;
+		};
+
+		sram_ipc2: memory@2007C000 {
+			reg = <0x2007C000 0x4000>;
 		};
 	};
 
@@ -45,6 +49,17 @@
 			memory-region = <&sram_ipc1>;
 			mboxes = <&mbox 2>, <&mbox 3>;
 			mbox-names = "tx", "rx";
+			role = "host";
+			zephyr,priority = <1 PRIO_COOP>;
+			zephyr,buffer-size = <128>;
+			status = "okay";
+		};
+
+		ipc2: ipc2 {
+			compatible = "zephyr,ipc-openamp-static-vrings";
+			memory-region = <&sram_ipc2>;
+			mboxes = <&mbox 4>, <&mbox 5>;
+			mbox-names = "rx", "tx";
 			role = "host";
 			zephyr,priority = <1 PRIO_COOP>;
 			zephyr,buffer-size = <128>;
